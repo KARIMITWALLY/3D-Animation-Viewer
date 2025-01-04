@@ -3,59 +3,116 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Model Animation</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/examples/js/loaders/GLTFLoader.js"></script>
+  <title>3D Animation Viewer</title>
+
+  <!-- Include Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r110/three.min.js"></script>
+
+  <!-- Include GLTFLoader -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/loaders/GLTFLoader.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+    }
+    button {
+      display: block;
+      margin-bottom: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Interactive 3D Model Animation</h1>
-  <div id="buttons">
+  <!-- UI Buttons -->
+  <div id="ui">
     <button id="playButton1">Transmitting & Receiving</button>
     <button id="playButton2">Depth & Resolution of D1</button>
   </div>
-  <div id="container"></div>
 
   <script>
-    // Initialize scene, camera, and renderer
+    // Scene, Camera, and Renderer Setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Load the GLB file
+    // Variables for Animation
+    let mixer, actions = {}, clock = new THREE.Clock();
+
+    // Load GLB File
     const loader = new THREE.GLTFLoader();
-    let mixer; // For animation
     loader.load('01BasicIdea.glb', (gltf) => {
-      scene.add(gltf.scene);
+      const model = gltf.scene;
+      scene.add(model);
 
-      // Set up animation mixer and actions
-      mixer = new THREE.AnimationMixer(gltf.scene);
-      const animations = gltf.animations;
-
-      // Define animation actions
-      const action1 = mixer.clipAction(animations[0]); // Keyframe 0-110
-      const action2 = mixer.clipAction(animations[1]); // Keyframe 110-140
-
-      // Button functionality
-      document.getElementById('playButton1').addEventListener('click', () => {
-        action1.reset().play();
+      // Set up animations
+      mixer = new THREE.AnimationMixer(model);
+      gltf.animations.forEach((clip) => {
+        const action = mixer.clipAction(clip);
+        actions[clip.name] = action;
       });
 
-      document.getElementById('playButton2').addEventListener('click', () => {
-        action2.reset().play();
-      });
+      // Play default animation (if needed)
+      if (Object.keys(actions).length > 0) {
+        const firstClipName = Object.keys(actions)[0];
+        actions[firstClipName].play();
+      }
+    }, undefined, (error) => {
+      console.error('Error loading GLB:', error);
     });
 
+    // Camera Position
     camera.position.z = 5;
 
-    // Render loop
+    // Animation Function
     function animate() {
       requestAnimationFrame(animate);
-      if (mixer) mixer.update(0.01); // Update animation mixer
+      const delta = clock.getDelta();
+      if (mixer) mixer.update(delta);
       renderer.render(scene, camera);
     }
     animate();
+
+    // Button Events
+    document.getElementById('playButton1').addEventListener('click', () => {
+      playAnimation('Transmitting & Receiving', 0, 110);
+    });
+
+    document.getElementById('playButton2').addEventListener('click', () => {
+      playAnimation('Depth & Resolution of D1', 110, 140);
+    });
+
+    // Play Animation Function
+    function playAnimation(name, startFrame, endFrame) {
+      if (mixer) {
+        // Stop all currently playing animations
+        mixer.stopAllAction();
+
+        // Create a new action with limited time (start and end frames)
+        const clip = new THREE.AnimationClip(name, endFrame / 24 - startFrame / 24, []);
+        const action = mixer.clipAction(clip);
+
+        // Set the range for the action
+        action.time = startFrame / 24; // Start frame (in seconds)
+        action.loop = THREE.LoopOnce;
+        action.clampWhenFinished = true;
+
+        // Play the action
+        action.play();
+      }
+    }
   </script>
 </body>
 </html>
